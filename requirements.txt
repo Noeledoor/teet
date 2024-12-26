@@ -1,5 +1,5 @@
-Flask==2.2.2
-Werkzeug==2.1.2
+Flask==2.3.0  # Ensure you're using Flask 2.3.0
+Werkzeug==2.3.0  # Upgrade Werkzeug to 2.3.0 or higher
 google-auth==2.22.0
 google-auth-oauthlib==0.5.3
 google-auth-httplib2==0.1.0
