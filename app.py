@@ -1,38 +1,19 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
 import os
+import json
 
 app = Flask(__name__)
 
 # Constants
-GOOGLE_DRIVE_CREDENTIALS = "client_secret_71595812752-87e6q719uk60gaa73pqa0f6eip0gd8er.apps.googleusercontent.com.json"
 GOOGLE_DRIVE_FOLDER_ID = "1uCo660V9AqfNQlXtVYu2_fzR_JJIL10i"
-SCOPES = ['https://www.googleapis.com/auth/drive.file']  # Permission to upload files
 
-# Function to get credentials
-def get_credentials():
-    creds = None
-    # Check if the token exists (for authenticated users)
-    if os.path.exists('token.json'):
-        creds = Credentials.from_authorized_user_file('token.json', SCOPES)
-    
-    # If no valid credentials, let the user log in
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file(
-                GOOGLE_DRIVE_CREDENTIALS, SCOPES)
-            creds = flow.run_local_server(port=0)
-        
-        # Save the credentials for the next run
-        with open('token.json', 'w') as token:
-            token.write(creds.to_json())
-    
-    return creds
+@app.route('/')
+def index():
+    # Serve the HTML file for the root route
+    return send_from_directory('.', 'run.html')
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
@@ -43,15 +24,18 @@ def upload_file():
     if file.filename == '':
         return jsonify({"message": "No selected file"}), 400
 
+    # Save the file locally
     file_path = f"./uploads/{file.filename}"
+    os.makedirs("./uploads", exist_ok=True)
     file.save(file_path)
 
     try:
-        # Get credentials and authenticate with Google Drive
-        creds = get_credentials()
+        # Load Google Drive credentials from an environment variable
+        creds_json = json.loads(os.environ["GOOGLE_DRIVE_CREDENTIALS"])
+        creds = Credentials.from_authorized_user_info(creds_json)
         drive_service = build('drive', 'v3', credentials=creds)
 
-        # Upload file to Google Drive
+        # Upload the file to Google Drive
         media = MediaFileUpload(file_path, mimetype=file.content_type)
         uploaded_file = drive_service.files().create(
             body={"name": file.filename, "parents": [GOOGLE_DRIVE_FOLDER_ID]},
@@ -59,14 +43,17 @@ def upload_file():
             fields='id'
         ).execute()
 
-        # Remove the file from the local storage
+        # Clean up the local file
         os.remove(file_path)
 
         return jsonify({"message": "File uploaded successfully", "file_id": uploaded_file.get('id')}), 200
-    
     except Exception as e:
-        return jsonify({"message": f"An error occurred: {str(e)}"}), 500
+        # Clean up the local file in case of failure
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        return jsonify({"message": "An error occurred", "error": str(e)}), 500
 
 if __name__ == '__main__':
+    # Ensure the 'uploads' directory exists
     os.makedirs("./uploads", exist_ok=True)
     app.run(debug=True)
