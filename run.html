@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Selfie Uploader</title>
+</head>
+<body>
+  <h1>Upload Your Selfie</h1>
+  <form id="uploadForm" enctype="multipart/form-data">
+    <input type="file" id="selfie" name="selfie" accept="image/*" required>
+    <button type="submit">Upload</button>
+  </form>
+  <div id="status"></div>
+
+  <script>
+    document.getElementById('uploadForm').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const fileInput = document.getElementById('selfie');
+      const formData = new FormData();
+      formData.append('selfie', fileInput.files[0]);
+
+      const response = await fetch('/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json();
+      document.getElementById('status').innerText = result.message;
+    });
+  </script>
+</body>
+</html>
